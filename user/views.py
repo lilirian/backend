@@ -6,12 +6,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate, get_user_model
 from .serializers import UserRegistrationSerializer, UserLoginSerializer, UserSerializer, LikeSerializer, AvatarUploadSerializer, MatchSerializer
 from .models import User, Like, Match
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
 from django.http import FileResponse
 from django.conf import settings
 import os
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -43,9 +44,9 @@ class UserLoginView(APIView):
             username = serializer.validated_data['username']
             password = serializer.validated_data['password']
             
-            # 首先检查用户是否存在
+            # 首先检查用户是否存在（支持邮箱登录）
             try:
-                user = User.objects.get(username=username)
+                user = User.objects.get(Q(username=username) | Q(email=username))
             except User.DoesNotExist:
                 return Response({'error': '用户不存在'}, status=status.HTTP_401_UNAUTHORIZED)
             
@@ -140,8 +141,8 @@ class MatchViewSet(viewsets.ViewSet):
         
         # 创建喜欢关系
         like_data = {
-            'from_user': request.user.id,
-            'to_user': to_user.id
+            'from_user': request.user,
+            'to_user': to_user
         }
         
         serializer = LikeSerializer(data=like_data)
@@ -166,3 +167,155 @@ class MatchViewSet(viewsets.ViewSet):
         matched_users = User.objects.filter(id__in=matched_user_ids)
         serializer = UserSerializer(matched_users, many=True, context={'request': request})
         return Response(serializer.data)
+
+class UserProfileView(APIView):
+    permission_classes = [IsAuthenticated]
+    
+    def get(self, request):
+        try:
+            user = request.user
+            serializer = UserSerializer(user, context={'request': request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def put(self, request):
+        try:
+            user = request.user
+            serializer = UserSerializer(user, data=request.data, partial=True, context={'request': request})
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=status.HTTP_200_OK)
+            return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    @action(detail=False, methods=['post'])
+    def optimize(self, request):
+        try:
+            user = request.user
+            # 获取用户的基本信息
+            basic_info = {
+                'nickname': user.username,
+                'age': self.calculate_age(user.birth_date),
+                'gender': user.gender,
+                'bio': user.bio,
+                'interests': user.interests.split(',') if user.interests else []
+            }
+            
+            # 分析用户资料
+            suggestions = self.analyze_profile(basic_info)
+            
+            # 生成优化建议
+            optimized_bio = self.generate_optimized_bio(basic_info)
+            
+            return Response({
+                'suggestions': suggestions,
+                'optimized_bio': optimized_bio,
+                'keywords': self.extract_keywords(optimized_bio)
+            })
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+    
+    def calculate_age(self, birth_date):
+        if not birth_date:
+            return None
+        today = timezone.now().date()
+        return today.year - birth_date.year - ((today.month, today.day) < (birth_date.month, birth_date.day))
+    
+    def analyze_profile(self, basic_info):
+        suggestions = []
+        
+        # 检查昵称
+        if not basic_info['nickname'] or len(basic_info['nickname']) < 2:
+            suggestions.append('建议设置一个更有特色的昵称')
+        
+        # 检查年龄
+        if not basic_info['age']:
+            suggestions.append('建议完善年龄信息')
+        
+        # 检查个人介绍
+        if not basic_info['bio']:
+            suggestions.append('建议添加个人介绍')
+        elif len(basic_info['bio']) < 50:
+            suggestions.append('建议丰富个人介绍内容')
+        
+        # 检查兴趣爱好
+        if not basic_info['interests']:
+            suggestions.append('建议添加兴趣爱好')
+        elif len(basic_info['interests']) < 3:
+            suggestions.append('建议添加更多兴趣爱好')
+        
+        return suggestions
+    
+    def generate_optimized_bio(self, basic_info):
+        # 根据用户信息生成优化后的个人介绍
+        bio_parts = []
+        
+        # 添加基本信息
+        if basic_info['nickname']:
+            bio_parts.append(f"我是{basic_info['nickname']}")
+        
+        if basic_info['age']:
+            bio_parts.append(f"今年{basic_info['age']}岁")
+        
+        # 添加兴趣爱好
+        if basic_info['interests']:
+            interests_str = '、'.join(basic_info['interests'])
+            bio_parts.append(f"喜欢{interests_str}")
+        
+        # 添加个人介绍
+        if basic_info['bio']:
+            bio_parts.append(basic_info['bio'])
+        
+        # 添加结尾
+        bio_parts.append("希望能在这里遇到志同道合的朋友")
+        
+        return '，'.join(bio_parts)
+    
+    def extract_keywords(self, text):
+        # 简单的关键词提取
+        keywords = []
+        common_words = {'的', '了', '是', '在', '我', '有', '和', '就', '不', '人', '都', '一', '一个', '上', '也', '很', '到', '说', '要', '去', '你', '会', '着', '没有', '看', '好', '自己', '这'}
+        
+        words = text.split('，')
+        for word in words:
+            if len(word) > 1 and word not in common_words:
+                keywords.append(word)
+        
+        return keywords[:5]  # 返回前5个关键词
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_likes_list(request):
+    """
+    获取当前用户的喜欢列表
+    """
+    try:
+        # 获取当前用户的所有喜欢记录
+        likes = Like.objects.filter(from_user=request.user)
+        
+        # 获取被喜欢用户的信息
+        liked_users = []
+        for like in likes:
+            user = like.to_user
+            liked_users.append({
+                'id': user.id,
+                'username': user.username,
+                'nickname': user.nickname,
+                'avatar_url': request.build_absolute_uri(user.avatar.url) if user.avatar else None,
+                'age': user.age,
+                'location': user.location,
+                'interests': user.interests
+            })
+            
+        return Response({
+            'code': 200,
+            'message': '获取成功',
+            'data': liked_users
+        })
+    except Exception as e:
+        return Response({
+            'code': 500,
+            'message': str(e)
+        }, status=500)

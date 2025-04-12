@@ -16,7 +16,7 @@ class UserSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'avatar', 'gender', 'birth_date', 'bio', 'age', 'avatar_url')
+        fields = ('id', 'username', 'nickname', 'email', 'avatar', 'gender', 'birth_date', 'bio', 'age', 'avatar_url', 'location', 'interests')
         read_only_fields = ('id', 'username', 'email')
     
     def get_age(self, obj):
@@ -28,7 +28,7 @@ class UserSerializer(serializers.ModelSerializer):
     def get_avatar_url(self, obj):
         if obj.avatar:
             return self.context['request'].build_absolute_uri(obj.avatar.url)
-        return None
+        return self.context['request'].build_absolute_uri('/static/images/default-avatar.png')
 
 class AvatarUploadSerializer(serializers.ModelSerializer):
     class Meta:
