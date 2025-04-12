@@ -1,143 +1,201 @@
-# 用户认证系统API文档
+# 恋爱桥 API 文档
 
-## 1. 用户注册
+## 基础信息
 
-### 接口说明
-- **接口地址**: `/api/auth/register/`
-- **请求方式**: POST
-- **接口描述**: 用户注册新账号
+- 基础URL: `http://127.0.0.1:8000/api/`
+- 所有请求都需要在 Header 中包含 `Content-Type: application/json`
+- 需要认证的接口需要在 Header 中包含 `Authorization: Bearer <token>`
 
-### 请求参数
+## 用户认证
+
+### 用户注册
+- **URL**: `/user/register/`
+- **方法**: POST
+- **描述**: 注册新用户
+- **请求体**:
 ```json
 {
-    "email": "string",      // 必填，用户邮箱
-    "username": "string",   // 必填，用户名
-    "password": "string",   // 必填，密码（至少6位）
-    "password2": "string"   // 必填，确认密码
+    "username": "string",
+    "email": "string",
+    "password": "string",
+    "gender": "M/F",
+    "birth_date": "YYYY-MM-DD",
+    "bio": "string"
 }
 ```
-
-### 响应参数
-成功响应 (201 Created):
+- **响应**:
 ```json
 {
     "message": "注册成功",
     "user": {
-        "email": "user@example.com",
-        "username": "username"
+        "email": "string",
+        "username": "string"
     },
     "tokens": {
-        "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-        "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+        "refresh": "string",
+        "access": "string"
     }
 }
 ```
 
-错误响应 (400 Bad Request):
+### 用户登录
+- **URL**: `/user/login/`
+- **方法**: POST
+- **描述**: 用户登录
+- **请求体**:
 ```json
 {
-    "email": ["该邮箱已被注册"],
-    "password": ["密码太短", "密码不能全是数字"],
-    "password2": ["两次输入的密码不一致"]
+    "username": "string",
+    "password": "string"
 }
 ```
-
-## 2. 用户登录
-
-### 接口说明
-- **接口地址**: `/api/auth/login/`
-- **请求方式**: POST
-- **接口描述**: 用户登录获取访问令牌
-
-### 请求参数
+- **响应**:
 ```json
 {
-    "email": "string",    // 必填，用户邮箱
-    "password": "string"  // 必填，用户密码
-}
-```
-
-### 响应参数
-成功响应 (200 OK):
-```json
-{
-    "message": "登录成功",
+    "refresh": "string",
+    "access": "string",
     "user": {
-        "email": "user@example.com",
-        "username": "username"
-    },
-    "tokens": {
-        "refresh": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9...",
-        "access": "eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9..."
+        "id": "integer",
+        "username": "string",
+        "email": "string",
+        "avatar": "string",
+        "gender": "string",
+        "birth_date": "string",
+        "bio": "string",
+        "age": "integer",
+        "avatar_url": "string"
     }
 }
 ```
 
-错误响应 (401 Unauthorized):
+## 用户管理
+
+### 上传头像
+- **URL**: `/user/users/upload_avatar/`
+- **方法**: POST
+- **描述**: 上传用户头像
+- **认证**: 需要
+- **Content-Type**: `multipart/form-data`
+- **请求体**:
+  - `avatar`: 图片文件（jpg/png，<2MB）
+- **响应**:
 ```json
 {
-    "error": "邮箱或密码错误"
+    "id": "integer",
+    "username": "string",
+    "email": "string",
+    "avatar": "string",
+    "gender": "string",
+    "birth_date": "string",
+    "bio": "string",
+    "age": "integer",
+    "avatar_url": "string"
 }
 ```
 
-## 3. 令牌说明
+### 获取用户头像
+- **URL**: `/user/users/{user_id}/avatar/`
+- **方法**: GET
+- **描述**: 获取用户头像
+- **认证**: 需要
+- **响应**: 图片文件（content-type: image/jpeg）
 
-### 访问令牌 (Access Token)
-- 用于访问需要认证的API接口
-- 在请求头中添加：`Authorization: Bearer <access_token>`
-- 有效期：60分钟
+## 匹配功能
 
-### 刷新令牌 (Refresh Token)
-- 用于获取新的访问令牌
-- 有效期：1天
-
-## 4. 错误码说明
-
-| 状态码 | 说明 |
-|--------|------|
-| 200 | 请求成功 |
-| 201 | 创建成功 |
-| 400 | 请求参数错误 |
-| 401 | 未授权/认证失败 |
-| 500 | 服务器内部错误 |
-
-## 5. 使用示例
-
-### 注册请求示例
-```bash
-curl -X POST http://your-domain/api/auth/register/ \
--H "Content-Type: application/json" \
--d '{
-    "email": "test@example.com",
-    "username": "testuser",
-    "password": "password123!",
-    "password2": "password123!"
-}'
+### 获取推荐用户
+- **URL**: `/user/match/recommendations/`
+- **方法**: GET
+- **描述**: 获取推荐用户列表
+- **认证**: 需要
+- **响应**:
+```json
+[
+    {
+        "id": "integer",
+        "username": "string",
+        "email": "string",
+        "avatar": "string",
+        "gender": "string",
+        "birth_date": "string",
+        "bio": "string",
+        "age": "integer",
+        "avatar_url": "string"
+    }
+]
 ```
 
-### 登录请求示例
-```bash
-curl -X POST http://your-domain/api/auth/login/ \
--H "Content-Type: application/json" \
--d '{
-    "email": "test@example.com",
-    "password": "password123!"
-}'
+### 喜欢用户
+- **URL**: `/user/match/like/`
+- **方法**: POST
+- **描述**: 喜欢某个用户
+- **认证**: 需要
+- **请求体**:
+```json
+{
+    "to_user_id": "integer"
+}
+```
+- **响应**:
+```json
+{
+    "id": "integer",
+    "from_user": "integer",
+    "to_user": "integer",
+    "created_at": "datetime"
+}
 ```
 
-### 访问受保护API示例
-```bash
-curl -X GET http://your-domain/api/protected/ \
--H "Authorization: Bearer <access_token>"
+### 获取匹配列表
+- **URL**: `/user/match/matches/`
+- **方法**: GET
+- **描述**: 获取互相喜欢的用户列表
+- **认证**: 需要
+- **响应**:
+```json
+[
+    {
+        "id": "integer",
+        "user1": "integer",
+        "user2": "integer",
+        "status": "string",
+        "created_at": "datetime"
+    }
+]
 ```
 
-## 6. 注意事项
+## 错误响应
 
-1. 所有API请求都需要使用HTTPS协议
-2. 密码要求：
-   - 至少6个字符
-   - 不能全是数字
-   - 不能与用户名太相似
-3. 邮箱必须是有效的邮箱格式
-4. 建议定期更换密码
-5. 请妥善保管访问令牌，不要泄露给他人 
+### 400 Bad Request
+```json
+{
+    "error": "错误信息"
+}
+```
+
+### 401 Unauthorized
+```json
+{
+    "error": "身份认证信息未提供"
+}
+```
+
+### 404 Not Found
+```json
+{
+    "error": "资源不存在"
+}
+```
+
+## 注意事项
+
+1. 头像上传限制：
+   - 文件大小：最大 2MB
+   - 文件类型：仅支持 JPG 和 PNG 格式
+
+2. 用户认证：
+   - 所有需要认证的接口都需要在 Header 中包含 `Authorization: Bearer <token>`
+   - token 可以通过登录接口获取
+
+3. 头像访问：
+   - 头像 URL 可以通过用户信息中的 `avatar_url` 字段获取
+   - 也可以通过 `/user/users/{user_id}/avatar/` 接口直接获取图片文件 

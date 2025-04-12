@@ -9,6 +9,9 @@ from .models import User, Like, Match
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from django.db.models import Q
+from django.http import FileResponse
+from django.conf import settings
+import os
 
 User = get_user_model()
 
@@ -74,6 +77,18 @@ class UserViewSet(viewsets.ModelViewSet):
             serializer.save()
             return Response(UserSerializer(request.user, context={'request': request}).data)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['get'])
+    def avatar(self, request, pk=None):
+        user = self.get_object()
+        if not user.avatar:
+            return Response({'error': '用户没有头像'}, status=status.HTTP_404_NOT_FOUND)
+        
+        avatar_path = user.avatar.path
+        if not os.path.exists(avatar_path):
+            return Response({'error': '头像文件不存在'}, status=status.HTTP_404_NOT_FOUND)
+        
+        return FileResponse(open(avatar_path, 'rb'), content_type='image/jpeg')
 
     @action(detail=False, methods=['get'])
     def matches(self, request):
