@@ -27,7 +27,7 @@ SECRET_KEY = "django-insecure-sghpz)u%5atlr0owzf#b@2pv$zpg)@!&ypeiu%ffs5v#sh-+et
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 
 # Application definition
@@ -127,6 +127,11 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/4.2/howto/static-files/
 
 STATIC_URL = "static/"
+STATIC_ROOT = os.path.join(BASE_DIR, 'static')
+
+# Media files
+MEDIA_URL = '/media/'
+MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 # Default primary key field type
 # https://docs.djangoproject.com/en/4.2/ref/settings/#default-auto-field
@@ -187,10 +192,6 @@ CORS_EXPOSE_HEADERS = [
     'x-csrftoken',
 ]
 
-# 媒体文件配置
-MEDIA_URL = '/media/'
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
-
 # 文件上传配置
-FILE_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
-DATA_UPLOAD_MAX_MEMORY_SIZE = 10 * 1024 * 1024  # 10MB
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2621440  # 2.5MB
+DATA_UPLOAD_MAX_MEMORY_SIZE = 2621440  # 2.5MB

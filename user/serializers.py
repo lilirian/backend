@@ -27,8 +27,21 @@ class UserSerializer(serializers.ModelSerializer):
     
     def get_avatar_url(self, obj):
         if obj.avatar:
-            return self.context['request'].build_absolute_uri(obj.avatar.url)
-        return self.context['request'].build_absolute_uri('/static/images/default-avatar.png')
+            # 检查是否是完整的URL
+            if obj.avatar.url.startswith('http'):
+                return obj.avatar.url
+            # 构建完整的URL
+            request = self.context.get('request')
+            if request:
+                # 确保返回的URL包含完整的域名
+                return request.build_absolute_uri(obj.avatar.url)
+            # 如果没有request对象，返回相对路径
+            return obj.avatar.url
+        # 返回默认头像
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri('/static/images/default-avatar.png')
+        return '/static/images/default-avatar.png'
 
 class AvatarUploadSerializer(serializers.ModelSerializer):
     class Meta:

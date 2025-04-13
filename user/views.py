@@ -13,6 +13,8 @@ from django.http import FileResponse
 from django.conf import settings
 import os
 from django.utils import timezone
+import requests
+import json
 
 User = get_user_model()
 
@@ -76,8 +78,18 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer = AvatarUploadSerializer(request.user, data=request.data, partial=True)
         if serializer.is_valid():
             serializer.save()
-            return Response(UserSerializer(request.user, context={'request': request}).data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+            # 重新获取用户信息，确保返回最新的头像URL
+            user_serializer = UserSerializer(request.user, context={'request': request})
+            return Response({
+                'status': 'success',
+                'message': '头像上传成功',
+                'data': user_serializer.data
+            })
+        return Response({
+            'status': 'error',
+            'message': '上传失败',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
 
     @action(detail=True, methods=['get'])
     def avatar(self, request, pk=None):
@@ -319,3 +331,111 @@ def get_likes_list(request):
             'code': 500,
             'message': str(e)
         }, status=500)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def optimize_profile(request):
+    """
+    使用腾讯元宝API优化用户个人简介
+    """
+    try:
+        # 获取当前用户
+        user = request.user
+        user_profile = UserProfile.objects.get(user=user)
+        
+        # 获取当前简介
+        current_bio = user_profile.bio or ""
+        
+        # 调用腾讯元宝API
+        url = 'https://open.hunyuan.tencent.com/openapi/v1/agent/chat/completions'
+        headers = {
+            'X-Source': 'openapi',
+            'Content-Type': 'application/json',
+            'Authorization': 'Bearer eDJrUI9XpQ64LjgMweTfoYh5DqIXJcAc'
+        }
+        
+        data = {
+            "assistant_id": "nDPb8gDN9hXy",
+            "user_id": str(user.id),
+            "stream": False,
+            "messages": [
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": f"请帮我优化以下个人简介，使其更加吸引人，同时保持原有的核心信息：{current_bio}"
+                        }
+                    ]
+                }
+            ]
+        }
+        
+        response = requests.post(url, headers=headers, json=data)
+        response_data = response.json()
+        
+        if response.status_code == 200:
+            optimized_bio = response_data['choices'][0]['message']['content']
+            
+            # 更新用户简介
+            user_profile.bio = optimized_bio
+            user_profile.save()
+            
+            return Response({
+                'status': 'success',
+                'message': '个人简介优化成功',
+                'optimized_bio': optimized_bio
+            })
+        else:
+            return Response({
+                'status': 'error',
+                'message': 'API调用失败',
+                'error': response_data
+            }, status=response.status_code)
+            
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=500)
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def get_user_profile(request):
+    try:
+        user = request.user
+        serializer = UserSerializer(user, context={'request': request})
+        return Response({
+            'status': 'success',
+            'data': serializer.data
+        })
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def update_user_profile(request):
+    try:
+        user = request.user
+        serializer = UserSerializer(user, data=request.data, partial=True, context={'request': request})
+        
+        if serializer.is_valid():
+            serializer.save()
+            return Response({
+                'status': 'success',
+                'message': '个人资料更新成功',
+                'data': serializer.data
+            })
+        return Response({
+            'status': 'error',
+            'message': '数据验证失败',
+            'errors': serializer.errors
+        }, status=status.HTTP_400_BAD_REQUEST)
+    except Exception as e:
+        return Response({
+            'status': 'error',
+            'message': str(e)
+        }, status=status.HTTP_400_BAD_REQUEST)
